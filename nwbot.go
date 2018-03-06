@@ -44,7 +44,7 @@ func main() {
         fmt.Println(t.IDStr, t.User.ID, t.User.ScreenName)
         fmt.Println(t.Text)
       }
-      
+
       if needToTweetAt(t.User.ID) {
         saveUIDThen(t.User.ID,
                     func() {
@@ -59,13 +59,7 @@ func main() {
     log.Error(err)
   }
 
-  // // tweet, resp, err := client.Statuses.Update("That's Numberwang!", &twitter.StatusUpdateParams{InReplyToStatusID: 970400943693996032})
-  //
-  // if err != nil {
-  //   log.Debug(resp.Body)
-  //   log.Error(err)
-  // }
-  // log.Info(tweet)
+
 }
 
 func needToTweetAt(uid int64) bool {
@@ -75,6 +69,13 @@ func needToTweetAt(uid int64) bool {
 func sendTweetTo(tid, username string, client *twitter.Client) {
   responseStr := "@" + username + " That's Numberwang!"//, &twitter.StatusUpdateParams{InReplyToStatusID: t.IDStr})
   fmt.Println(responseStr, tid)
+  // // tweet, resp, err := client.Statuses.Update("That's Numberwang!", &twitter.StatusUpdateParams{InReplyToStatusID: 970400943693996032})
+  //
+  // if err != nil {
+  //   log.Debug(resp.Body)
+  //   log.Error(err)
+  // }
+  // log.Info(tweet)
 }
 
 func _setup_twitter_client() *twitter.Client {
