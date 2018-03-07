@@ -3,7 +3,9 @@ package main
 import (
   "fmt"
   "os"
-
+  "regexp"
+  "gopkg.in/mgo.v2"
+  "gopkg.in/mgo.v2/bson"
   "github.com/dghubble/go-twitter/twitter"
   "github.com/dghubble/oauth1"
 	"github.com/op/go-logging"
@@ -23,49 +25,76 @@ var format = logging.MustStringFormatter(
 	`%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
 )
 
-
+var (
+  session, merr = mgo.Dial("localhost")
+  client = _setup_twitter_client()
+)
 
 func main() {
+  if merr != nil {
+      panic(merr)
+  }
+  defer session.Close()
   _setup_logger()
-  client := _setup_twitter_client()
 
-//TODO Rewrite to use stream
-  search, resp, err := client.Search.Tweets(&twitter.SearchTweetParams{
-    Query: "blockchain",
-  })
+  params := &twitter.StreamSampleParams{
+    StallWarnings: twitter.Bool(true),
+    // Query: "blockchain",
+  }
+  stream, err := client.Streams.Sample(params)
   log.Info("\n")
 
-  if search != nil {
+  if stream != nil {
+    defer stream.Stop()
     //TODO save tweet ID to db
     //TODO send tweet if not in db
-    //TODO send tweet in worker
-    for _, t := range search.Statuses {
-      if needToTweetAt(t.User.ID) {
-          saveUIDThen(t.User.ID, func() {
-                                   sendTweetTo(t.IDStr, t.User.ScreenName, client)
-                                 })
+    demux := twitter.NewSwitchDemux()
+    demux.Tweet = func(t *twitter.Tweet) {
+      txt := t.Text
+      match, _ := regexp.MatchString("( |#)blockchain )", txt)
+      if match && needToTweetAt(t.User.ID) {
+            saveUIDThen(t.User.ID,
+                        func() {
+                           fmt.Println(t.User.ID)
+                           sendTweetTo(t.IDStr, t.User.ScreenName)
+                        })
       }
-
+    }
+    for message := range stream.Messages {
+      demux.Handle(message)
     }
   }
   if err != nil {
-    log.Debug(resp.Body)
     log.Error(err)
   }
 }
 
+type User struct {
+        UserID  int64
+    }
+
 func saveUIDThen(uid int64, afterSave func()) int64 {
-  uid = uid
+  mongoClient := session.DB("nwbot").C("users")
+  err := mongoClient.Insert(&User{uid})
+  if err != nil {
+    log.Fatal(err)
+  }
   afterSave()
   return uid
 }
 
 func needToTweetAt(uid int64) bool {
-  return true
+  result := User{}
+  mongoClient := session.DB("nwbot").C("users")
+  merr = mongoClient.Find(bson.M{"userid": uid}).One(&result)
+  if merr != nil {
+    // log.Fatal(merr)
+  }
+  return result.UserID != uid
+
 }
 
-func sendTweetTo(tid, username string, client *twitter.Client) {
-
+func sendTweetTo(tid, username string) {
   responseStr := "@" + username + " That's Numberwang!"//, &twitter.StatusUpdateParams{InReplyToStatusID: t.IDStr})
   fmt.Println(responseStr, tid)
   // // tweet, resp, err := client.Statuses.Update(responseStr, &twitter.StatusUpdateParams{InReplyToStatusID: tid})
