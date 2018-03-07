@@ -40,26 +40,24 @@ func main() {
     //TODO send tweet if not in db
     //TODO send tweet in worker
     for _, t := range search.Statuses {
-      if err != nil {
-        fmt.Println(t.IDStr, t.User.ID, t.User.ScreenName)
-        fmt.Println(t.Text)
+      if needToTweetAt(t.User.ID) {
+          saveUIDThen(t.User.ID, func() {
+                                   sendTweetTo(t.IDStr, t.User.ScreenName, client)
+                                 })
       }
 
-      if needToTweetAt(t.User.ID) {
-        saveUIDThen(t.User.ID,
-                    func() {
-                      sendTweetTo(t.IDStr, t.User.ScreenName, client)
-                    }
-        )
-      }
     }
   }
   if err != nil {
     log.Debug(resp.Body)
     log.Error(err)
   }
+}
 
-
+func saveUIDThen(uid int64, afterSave func()) int64 {
+  uid = uid
+  afterSave()
+  return uid
 }
 
 func needToTweetAt(uid int64) bool {
@@ -67,9 +65,10 @@ func needToTweetAt(uid int64) bool {
 }
 
 func sendTweetTo(tid, username string, client *twitter.Client) {
+
   responseStr := "@" + username + " That's Numberwang!"//, &twitter.StatusUpdateParams{InReplyToStatusID: t.IDStr})
   fmt.Println(responseStr, tid)
-  // // tweet, resp, err := client.Statuses.Update("That's Numberwang!", &twitter.StatusUpdateParams{InReplyToStatusID: 970400943693996032})
+  // // tweet, resp, err := client.Statuses.Update(responseStr, &twitter.StatusUpdateParams{InReplyToStatusID: tid})
   //
   // if err != nil {
   //   log.Debug(resp.Body)
