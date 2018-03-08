@@ -37,27 +37,34 @@ func main() {
   defer session.Close()
   _setup_logger()
 
-  params := &twitter.StreamSampleParams{
+params := &twitter.StreamFilterParams{
+    Track: []string{"blockchain"},
     StallWarnings: twitter.Bool(true),
-    // Query: "blockchain",
-  }
-  stream, err := client.Streams.Sample(params)
+}
+stream, err := client.Streams.Filter(params)
+  // stream, err := client.Streams.Sample(params)
   log.Info("\n")
 
   if stream != nil {
     defer stream.Stop()
-    //TODO save tweet ID to db
-    //TODO send tweet if not in db
     demux := twitter.NewSwitchDemux()
     demux.Tweet = func(t *twitter.Tweet) {
       txt := t.Text
-      match, _ := regexp.MatchString("( |#)blockchain )", txt)
-      if match && needToTweetAt(t.User.ID) {
-            saveUIDThen(t.User.ID,
-                        func() {
-                           fmt.Println(t.User.ID)
-                           sendTweetTo(t.IDStr, t.User.ScreenName)
-                        })
+      match, _ := regexp.MatchString("( |#)blockchain ", txt)
+      if match {
+        if needToTweetAt(t.User.ID) {
+          saveUIDThen(t.User.ID,
+                      func() {
+                         fmt.Println(txt)
+                         go sendTweetTo(t.IDStr, t.User.ScreenName)
+                      })
+        } else {
+          table := session.DB("nwbot").C("dupes")
+          err := table.Insert(&User{t.User.ID})
+          if err != nil {
+            log.Fatal(err)
+          }
+        }
       }
     }
     for message := range stream.Messages {
@@ -71,11 +78,11 @@ func main() {
 
 type User struct {
         UserID  int64
-    }
+}
 
 func saveUIDThen(uid int64, afterSave func()) int64 {
-  mongoClient := session.DB("nwbot").C("users")
-  err := mongoClient.Insert(&User{uid})
+  table := session.DB("nwbot").C("users")
+  err := table.Insert(&User{uid})
   if err != nil {
     log.Fatal(err)
   }
@@ -85,8 +92,8 @@ func saveUIDThen(uid int64, afterSave func()) int64 {
 
 func needToTweetAt(uid int64) bool {
   result := User{}
-  mongoClient := session.DB("nwbot").C("users")
-  merr = mongoClient.Find(bson.M{"userid": uid}).One(&result)
+  table := session.DB("nwbot").C("users")
+  merr = table.Find(bson.M{"userid": uid}).One(&result)
   if merr != nil {
     // log.Fatal(merr)
   }

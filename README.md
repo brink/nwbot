@@ -19,8 +19,6 @@ Numberwang is this https://www.youtube.com/watch?v=xmBCh76_qWE
 ## TODOs
 * LoggerWorker
 * DB+tweet worker
-* ? Maybe have some percentage limiting so it's not everyone who ever does it
 * Are RT and replies potentially forever tweetable?
-* Implement storage of users
 * Separate concerns into separate workers
 * Ensure no races or multitweets because something is slow
