@@ -4,6 +4,8 @@ import (
   "fmt"
   "os"
   "regexp"
+  "time"
+  "math/rand"
   "gopkg.in/mgo.v2"
   "gopkg.in/mgo.v2/bson"
   "github.com/dghubble/go-twitter/twitter"
@@ -48,19 +50,24 @@ stream, err := client.Streams.Filter(params)
   if stream != nil {
     defer stream.Stop()
     demux := twitter.NewSwitchDemux()
+    s1 := rand.NewSource(time.Now().UnixNano())
+    r1 := rand.New(s1)
+
     demux.Tweet = func(t *twitter.Tweet) {
       txt := t.Text
       match, _ := regexp.MatchString("( |#)blockchain ", txt)
       if match {
         if needToTweetAt(t.User.ID) {
-          saveUIDThen(t.User.ID,
+          if r1.Intn(100) < 30 {
+            saveUIDThen(t.User.ID,
                       func() {
-                         fmt.Println(txt)
                          go sendTweetTo(t.IDStr, t.User.ScreenName)
                       })
+          }
         } else {
           table := session.DB("nwbot").C("dupes")
-          err := table.Insert(&User{t.User.ID})
+            tim := time.Now()
+          err := table.Insert(&User{t.User.ID, tim.Format("2006-01-02T15:04:05.999999-07:00")})
           if err != nil {
             log.Fatal(err)
           }
@@ -78,11 +85,13 @@ stream, err := client.Streams.Filter(params)
 
 type User struct {
         UserID  int64
+        Time  string
 }
 
 func saveUIDThen(uid int64, afterSave func()) int64 {
   table := session.DB("nwbot").C("users")
-  err := table.Insert(&User{uid})
+  t := time.Now()
+  err := table.Insert(&User{uid, t.Format("2006-01-02T15:04:05.999999-07:00")})
   if err != nil {
     log.Fatal(err)
   }
